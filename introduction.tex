@@ -1,0 +1,26 @@
+\section{Introduction}
+
+The collection of protocols found on the Internet has often been said to form an \textit{hourglass}, with the waist being formed by the \ac{IP} (and to some extent also \ac{TCP} and \ac{UDP})\footnote{http://tools.ietf.org/html/draft-rosenberg-internet-waist-hourglass-00}. In this model, \ac{IP} acts as a convergence protocol whose implementation is subject to little (if any) change. Much the same can be said about \ac{UDP}; and while \ac{TCP} does see frequent updates in the form of new options finding their way into the packet header, or new approaches to congestion and flow control \cite{IW10,cubic,more-tcp-cong-ctrl-refs}, its baseline functionality has been available since the first standardization efforts \cite{rfc793} (and is still wire-compatible with current implementations).
+
+Most innovation takes place on the extreme ends of the network stack: At the bottom, data-link and physical layer protocols are subject to constant improvement. At the top, new application layer protocols may be deployed with great ease, as these protocols are purely software-defined.
+
+The number of proposed new transport-layer protocols is not small (consider Multi-Path TCP, DCCP, SCTP, QUIC, UDP Lite to name but a few contributions), but there are practical issues in the form of middleboxes such as firewalls and \ac{NAT} gateways that make it difficult to roll out these new protocols in a significant number of Internet hosts. As middleboxes are not prepared to handle transport protocols other than TCP and UDP, they may fail to process and forward new protocols, or crash altogether \cite{ECN-survey}.
+
+The common wisdom for protocol implementors is therefore to put new functionality that could go into the transport layer in the application layer (where middleboxes are less likely to interfere with it) instead, and use either the existing transport-layer protocol implementations (as TLS and uTP do, for example), or at least reuse their header formats (e.g. TCP Minion) to form the actual packets sent. The implementors are free to define any application layer \ac{API} they deem suitable for their protocol, and later change it at will, too.
+
+We observe that this approach, implementing transport-layer functionality as application-layer protocols with arbitrary, possibly volatile \acp{API}, has undesirable effects on the usability and reusability of such protocols:: The programmer is required to use an \ac{API} different from the transport layer's, and consequently, protocol implementations for the same functionality are not necessarily exchangeable, although they could be from the perspective of the task they perform (e.g. different congestion control algorithms).
+
+In this work, we present Affix, a network framework designed to implement application-layer protocols while exhibiting transport-layer call semantics. Building on this design, we show that interesting functionality such as encryption, forward error correction, and compression can be added to programs without requiring deep changes to their use of the network stack.
+
+Since Affix components present to the caller and expect from the callee the same set of \ac{API} calls, they also lend themselves to be \textit{stacked} on top of one another. As such, it becomes feasible to deconstruct the desired properties of a not-yet existing transport protocol into a stack of Affix components, each implementing one function, and call into the top of the Affix stack to make use of the combined functionality. As the bottom of the Affix stack will call down into one of the existing transport protocol implementations, the outcome is clearly valid TCP or UDP. (Same codomain of the function, so to speak.)
+
+Evidently, Affix components may implement functions that are not transparently useful to a remote host (for example, encrypting the data on one host, but not being aware of encryption on the other). We approach this problem from two sides: ... (One, there are transparent Affix components; two, coordination Affix)
+
+The rest of the paper is structured as follows:
+
+* Explain the core idea of the framework --- domain and codomain of the function are identical / transport-layer API for the caller, and transport-layer API used to call down; stacking follows from this
+* Experiments showing we aren't terribly inefficient
+* Review related work
+* Conclusion and outlook (e.g., can we make Affix call into IP, and reuse the TCP/UDP header while modifying the other transport-layer functions, as Minion does? Re-implement TCP / components of it with greater flexibility? SILO did this I think.)
+
+

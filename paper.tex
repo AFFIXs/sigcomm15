@@ -1,0 +1,92 @@
+\documentclass[10pt,finalversion,endnotes]{sig-alternate-10pt}
+
+%\documentclass[letterpaper,twocolumn,10pt]{article}
+%\usepackage{usenix}
+\frenchspacing
+
+\newcommand{\eat}[1]{}
+
+\usepackage{epsfig,subfig}
+\usepackage{url}
+%\usepackage[small,compact]{titlesec}
+\usepackage{graphics}
+%\usepackage{geometry}
+\usepackage{multirow}
+\usepackage{xcolor}
+\usepackage[nolist]{acronym}
+\usepackage{color}
+\newcommand{\hilight}[1]{\colorbox{yellow}{#1}}
+
+
+%\geometry{verbose,nohead,papersize={8.5in,11in},left={1.0in},width={6.5in},
+%top={1.0in},bottom={1.0in}}
+%\setlength{\columnsep}{0.25in}
+
+\newcounter{magicrownumbers}
+\newcommand\rownumber{\stepcounter{magicrownumbers}\arabic{magicrownumbers}}
+
+
+\def\printcomments{2}
+
+\if\printcomments1
+    \usepackage{hyperref}
+    \newcommand{\yang}[1]{{\color{blue}\footnote{\color{blue}Yang: #1}}}
+    \newcommand{\cappos}[1]{{\color{red}\footnote{\color{red}JustinC: #1}}}
+    \newcommand{\chintan}[1]{{\color{purple}\footnote{\color{purple}Chintan: #1}}}
+    \newcommand{\albert}[1]{{\color{green}\footnote{\color{green}AlbertR: #1}}}
+\else
+    \if\printcomments2
+    \newcommand{\yang}[1]{{\color{blue}[Yang: #1]}}
+    \newcommand{\cappos}[1]{{\color{red}[JustinC: #1]}}
+    \newcommand{\chintan}[1]{{\color{purple}[Chintan: #1]}}
+    \newcommand{\albert}[1]{{\color{green}[AlbertR: #1]}}
+    \else
+        \newcommand{\yang}[1]{}
+        \newcommand{\cappos}[1]{}
+        \newcommand{\chintan}[1]{}
+        \newcommand{\albert}[1]{}
+    \fi
+\fi
+
+
+
+\begin{document}
+
+%don't want date printed
+\date{}
+
+
+\title{Affix: Componentized networking services for deployment by the people, for the people}
+
+\author{
+12 pages excluding references
+}
+\maketitle
+
+
+\sloppy
+
+%\bibliographystyle{acm}
+\bibliographystyle{abbrv}
+
+
+\input{acronyms}
+%\input{abstract}
+\input{introduction}
+%\input{goals}
+%\input{related}
+%\input{architecture}
+%\input{implementation}
+%\input{services}
+%\input{results}
+%\input{casestudy}
+%\input{conclusion}
+
+%\section*{Acknowledgments}
+
+\footnotesize
+%\renewcommand{\baselinestretch}{0}
+\bibliography{bibdata}
+
+\end{document}
+
