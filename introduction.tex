@@ -1,5 +1,29 @@
 \section{Introduction}
 
+Since its inception, the Internet has induced a flood of innovative
+networking technologies and applications. 
+Unfortunately, thee exist high barriers to entry for 
+new ideas that many of these never have a chance to reach widespread 
+deployment: 
+Creating new hardware for the Link layer is expensive and complex. 
+On the Internet and Transport layers, \ac{IP}, \ac{TCP} or \ac{UDP} 
+have evolved as the common middle ground between all Internetworked hosts; 
+also, it has proven difficult to deploy changes Internet-wide.
+
+Recently, \ac{SDR} and \ac{SDN} have made it practical to implement 
+and deploy research ideas within the current architectural and 
+deployment constraints.
+This work describes an analogous technique called 
+\acfp{SDS} for implementing and deploying research ideas 
+that are suitable for applying at the level of the socket \ac{API}.
+A key feature of this approach is that it 
+allows new networking functionality to be deployed incrementally,  
+without modification to existing networks or applications, 
+without special hardware, % (unlike \ac{SDR} and \ac{SDN}), 
+and in a user-controlled, end-to-end fashion.
+
+\albert{Old text follows...}
+
 The collection of protocols found on the Internet has often been
 said to form an \textit{hourglass}, with the waist being formed by
 the \ac{IP} (and to some extent also \ac{TCP} and
