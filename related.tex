@@ -1,0 +1,250 @@
+\section{Related Work}
+\label{sec-related}
+%\cappos{Perhaps move this entire section to the end.   I don't know what Affix
+%really is yet and we don't need to build off of these.}
+
+This work is heavily influenced by previous work 
+with a similar modular structure or with similar ideas.
+However, having explained in detail the specific goals of this 
+work in Section~\ref{sec-goals}, 
+previous approaches fall short of fulfilling our goals.
+
+\subsection{Componentized networking frameworks}
+
+Affix is similar in structure 
+to other componentized networking frameworks such as 
+x-kernel~\cite{hutchinson1991x,hutchinson23rpc,peterson1990x},
+\textsc{Tesla}~\cite{salz2002tesla, salz2003tesla},
+SILO~\cite{dutta2007silo, baldine2007unified},
+Click~\cite{Fu_TOCS_2002},
+and GNU Radio~\cite{blossom2004gnu}.
+However, while these frameworks make
+it easier to develop new networking services, 
+they do not encourage their deployment,
+because none satisfy the requirements for 
+democratic deployability.
+
+An early contribution, 
+x-kernel~\cite{hutchinson1991x,hutchinson23rpc,peterson1990x},
+is an operating system with a redesigned protocol stack 
+to better support composition of networking services.
+This approach, while highly efficient, does not support 
+democratic deployability because it (by design) requires operating system 
+support. Furthermore, x-kernel does not allow services to be 
+added and removed dynamically when a communication is initiated.
+  
+Like Affix, \textsc{Tesla}~\cite{salz2002tesla, salz2003tesla} 
+is an interposition layer that is situated 
+between applications and the network 
+stack on an operating system.
+While it tries to provide a mostly uniform 
+interface, \textsc{Tesla} is willing to break interface compatibility 
+in some scenarios. For example, it explicitly breaks 
+interface semantics in its mobility implementation. This 
+in turn implies that certain permutations of \textsc{Tesla} layers 
+involving the mobility layer would not be correct. 
+\textsc{Tesla} lacks the ability to manipulate the layers in a 
+flowgraph during runtime, so services must be coordinated
+a priori.
+
+Other frameworks including 
+SILO~\cite{dutta2007silo, baldine2007unified},
+Click~\cite{Fu_TOCS_2002},
+and GNU Radio~\cite{blossom2004gnu},
+have components that present varied interfaces.
+As a result, permutability is not satisfied and components 
+may be combined only in very particular ways.
+While some dynamic addition and removal of services 
+is supported -- Click, for example, 
+allows a new router configuration to be installed during 
+runtime -- individual components cannot be added, 
+removed, or reordered arbitrarily. 
+
+We have also seen componentized frameworks
+for offering services in a specific domain, 
+such as FRESCO~\cite{fresco_2013} for security services,
+BlockMon~\cite{blockmon_2013} for monitoring services, 
+and Pyretic~\cite{monsanto_composing_2013} for composing 
+routing rules.
+Like the more general componentized networking 
+frameworks, these do not meet the requirements
+for democratic deployability.
+
+\subsection{Supporting Internet evolution}
+
+Other prior work has addressed the goal of allowing 
+the Internet and Internet services to evolve
+more quickly, and without requiring consensus.
+
+The properties of interface compatibility
+and permutability described in Section~\ref{sec-goals}, 
+and their relationship to the evolution of new services,
+have been discussed in the context of other domains, 
+such as composable simulation systems~\cite{petty_composability_2003}
+and semantic web services~\cite{medjahed_multilevel_2005}.
+Affix is the first work to apply these concepts
+in the context of a componentized framework 
+for networking services that can be installed on 
+end-user devices, and to specifically address the problem 
+of democratic deployability.
+
+Similar goals have also been addressed in 
+ANTS~\cite{ants,Wetherall_SOSP_1999},
+a framework for programming active networks so that
+new protocols can be deployed dynamically without 
+a priori coordination. However, ANTS itself 
+requires mass deployment by network service 
+providers operating intermediate routers before 
+end-users can benefit from these protocols.
+In contrast -- and in line with the principles 
+of democratic deployment --  Affix services can 
+be deployed directly by end users on their own devices, 
+on legacy networks with legacy applications,
+without the involvement of service providers.
+
+We have also seen proposed future Internet architectures
+such as XIA~\cite{xia_2012} and FII~\cite{koponen_architecting_2011}
+that, like Affix, aim to 
+support the incremental deployment of new functionality, 
+with a similar approach to many key issues.
+However, unlike Affix, 
+these are not compatible with the current
+Internet, but are meant to guide the design 
+of future networks.
+
+
+\iffalse
+The semantic problems we describe are not isolated to
+situations where network functionality is added. It
+is not uncommon for different operating systems to have behavior that
+varies~\cite{IEEE:2001:ISRa}.
+Semantic differences have been a major source of confusion 
+both in academia~\cite{schmidt1995object, demmer2007towards, 
+salz2002tesla} and in industry~\cite{BSDLinuxDiff, 
+WinsockPort, NonBlockingDiff, BSDCompat, SOLINGERSemantics, CapposPythonBug1,
+REUSEADDRSemantics}.
+
+Our work is the first to validate semantic consistency when adding 
+network functionality.   As a result, other work makes no guarantees about
+the semantic validity of libraries or the correctness of their composition.
+
+
+
+However, like any systems work, a great deal of our inspiration came from 
+existing designs.   Our vision of a light-weight manner for adding network 
+functionality has been realized in many previous incarnations. We categorize previous works as following:
+
+\subsection{Separating Functionality}
+
+Many pieces of prior work discussed dividing network functionality into 
+components that can be added on demand.   
+SILO~\cite{dutta2007silo, baldine2007unified} proposes a system that adds 
+network functionality, but varies the interface for the different services. As 
+a result, arbitrary interfaces are not stackable,  leaving a 
+problem similar to that of conventional libraries.   
+  
+
+TESLA~\cite{salz2002tesla, salz2003tesla} works to provide a mostly uniform 
+interface.   However, it is clear that semantics are not maintained when 
+reading through their experiences.   For example, TESLA explicitly breaks 
+the interface semantics to handle cases like mobility.
+This implies that the TESLA layers cannot be stacked to create new 
+functionality, one of the important goals of our work.  
+
+%Demmer, et. al.~\cite{demmer2007towards} propose a message-based abstractionistency, but the abstraction is different from TCP and UDP, and therefore cannot be applied to legacy applications and networks. 
+
+The x-kernel work~\cite{hutchinson1991x,hutchinson23rpc,peterson1990x} uses 
+an abstraction that deals with efficiently passing network
+data between different protocol objects on the local system.   This provides 
+a high degree of network control along a very low level API, but requires
+extensive operating system support.  x-kernel also fixes the network layers 
+at boot time; therefore new functionalities cannot be added {\em on-the-fly}, 
+and as the result the system cannot adapt to changing network and environment 
+conditions.
+
+\subsection{Middleware}
+
+Our shim approach is inspired by several research efforts that use a 
+intermediate layer between the application and the network stack, to 
+achieve different goals. Our own work, ViFi~\cite{vifi}, uses a special 
+driver to capture application packets to modify them. ViFi adds a header 
+to each packet to provide additional network information to the remote 
+server. 
+
+The DTN2 Bundle Protocol~\cite{dtn_bundle} is another shim-like architecture 
+proposed for enabling routing in sparsely connected networks. The bundle 
+protocol resides between the application and the transport layer, and 
+receives all application packets. The protocol aggregates packets into 
+bundles and may route copies of a bundle to multiple nodes, to ensure 
+that the packet get delivered in the sparse environment. 
+
+%Moving beyond the networking context, a shim layer-like approach has 
+%been used in operating systems and file systems. The Apple Filing 
+%Protocol(AFP)~\cite{afp} intercepts file system commands and forwards 
+%the system call based on whether the file resides locally or on a 
+%remote server. 
+
+Our goals for using a shim layer is different. We use the 
+shim layer to develop an infrastructure that allows network engineers 
+and programmers to easily add network functionality and build 
+self-adapting applications. 
+
+\subsection{Network functionality} 
+
+Several researchers have worked on the problem of adding new 
+functionality to networks. 
+
+Active networks~\cite{tennenhouse1997survey} research introduced an 
+architecture where network elements such as routers and switches make 
+decisions for each packet according to some programming logic; in effect, 
+adding network functionalities as packets are routed.  This requires changes
+in the middle of the network, on devices with relatively limited computation
+and tight timing constraints.  While shims could take advantages of this
+functionality, shims can also operate on end hosts.   This makes 
+deployment and adoption much easier. 
+
+Similar to active networks, overlay networks~\cite{stoica2002internet} 
+is another architecture that enables adding new network functionality.  
+Overlay networks, as the name suggests, overlays an alternate network 
+over the Internet to add additional network functionality such as 
+security~\cite{ron}, QoS~\cite{overqos}, and reliable 
+multicast~\cite{overcast}. Our shim architecture can easily encapsulate the
+functionality rpovided by overlay networks and mask it from the application.
+Shims also can add functionality to the end hosts.
+
+Other solutions that add network functionality either assume that 
+functionality that is added is transparent to the remote 
+server~\cite{park2006connection,pucha2007exploiting, pucha2008adaptive, 
+tolia2006architecture} or that the remote server already have the correct 
+protocols in place~\cite{salz2002tesla, salz2003tesla, hutchinson1991x,
+hutchinson23rpc,peterson1990x}. These assumptions restrict the kinds of 
+network functionalities that can be added, severely affecting 
+extensibility, one of our design goals.   
+
+\subsection{Self-adapting protocols}
+
+One of the primary goals of our proposed work is to design an 
+infrastructure that will let applications easily adapt to changing 
+network environments. 
+
+There have been similar proposals to design self-adapting protocols, 
+especially in the wireless network space. Our own work, R3~\cite{r3}, 
+is a routing protocol that self adapts as network connectivity varies 
+from being well-connected to being sparsely connected. The R3 protocol 
+monitors the connectivity of the network to adapt the routing protocol. 
+For example, R3 sends multiple copies of packets in sparsely connected 
+networks, in the hope that at least one copy will reach the destination, 
+but tunes down the number of replicas as the network becomes more connected.
+
+Other related systems adapt link-layer rates according to 
+mobility~\cite{ravindranath_nsdi11}, adapt the physical layer channel 
+width according to the power of the wireless device~\cite{chandra_sigcomm08}, 
+adapt routing in wireless mesh networks~\cite{rozner_tmc09}, etc. All 
+of these systems focus on one aspect of diversity and one system variable, 
+and adapt the system variable for the diverse condition. In contrast, we 
+propose an infrastructure that will not only help combat current diversity 
+challenges, but thats also extensible and can combat diversity challenges 
+that may arise in the future. 
+
+\fi
+
