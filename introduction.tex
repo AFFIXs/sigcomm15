@@ -10,8 +10,8 @@ The topmost architectural layer, the Application layer, has traditionally
 proven most receptive to new protocols and services. 
 The layers below have come to present a higher barrier to entry for 
 new ideas: 
-The Transport and Internet layer are dominated by the 
-\ac{IP}, \ac{TCP} and \ac{UDP} protocols which have evolved as 
+The Transport and Internet layer are dominated by 
+\ac{IP}, \ac{TCP} and \ac{UDP} which have evolved as 
 the common middle ground between all Internetworked hosts, 
 making changes difficult to deploy on a Internet-wide scale.
 On the Link layer, it is expensive and complex to create new hardware 
@@ -41,10 +41,10 @@ functional components.
 
 This property has a real-world benefit:
 Since new Transport-layer protocols are difficult to deploy 
-on the Internet, the common wisdom for implementors is to put new
-Transport-layer functionality in the Application layer 
-(where middleboxes are less likely to interfere with it)
-instead, and either use existing Transport-layer protocol
+on the Internet, the prevailing wisdom for implementors is to put new
+Transport-layer functionality in the Application layer instead,
+where middleboxes are less likely to interfere with it. 
+New protocols then either use existing Transport-layer protocol
 implementations (as TLS and uTP do, for example), or at least reuse
 their header formats (e.g. TCP Minion) to form the actual packets
 sent. Following this approch, implementors are free to define any 
