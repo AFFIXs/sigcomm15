@@ -1,0 +1,105 @@
+\subsection{Coordination Service}
+\label{subsec-services-coordination}
+\cappos{Make this more formal.   Leverage the formalisms to define
+a calculus for communication in this domain...}
+
+Most Affix services operate on network traffic to improve performance, 
+but unlike standard library or other implementations 
+of these services, they can be deployed in a democratic fashion. 
+However, they do not themselves contribute to democratic deployment. 
+In contrast, the function of the \emph{Coordination} service is to 
+enable democratic deployment. 
+
+The Coordination service identifies the Affix components used 
+by an opposite side of a communication flow, then loads a matching 
+set of Affix components on the local host.
+This enables communication through any composition
+of services without prior arrangement.
+The Coordination service described in this section is 
+the exemplar service included in the Affix implementation and 
+deployed on the Seattle testbed; 
+it is also possible to implement alternative coordination services
+with equivalent functionality but different properties.
+
+
+\iffalse
+
+While some Affix components can be used by either side of a 
+connection transparently, many components will 
+require some level of client-server communication in order 
+to work properly. The client and server
+needs to balance the Affix stack against each other in order 
+to ensure proper communication. Take
+for example that the server is using both the CompressionAffix 
+and the EncryptionAffix in order
+to compress and encrypt it's communication. If a client wants 
+to connect and communicate with the
+server, than they must also use the proper CompressionAffix 
+and EncryptionAffix in order to be able
+to decrypt and uncompress the data before returning the data 
+to the application layer. In order for
+the client to find out that the server is using these two 
+components, it needs to be able to communicate
+and coordinate with each other to ensure both sides are 
+using the same Affix stack.
+
+The practicality of different approachs taken to coordinate 
+Affix stack information between clients and servers 
+will depend on several factors. Consider the following 
+two approaches.  
+
+Approach One: A special purpose Affix component is put in place at the bottom of the network stack. 
+Whenever a packet is received this componen willt facillitate communications to ensure the correct 
+Affix stack is put into place on both sides of the connection.
+
+Approach Two: A sever decides what Affixes will be used, and advertises the result under an applicaiton 
+specific identifier, and port number in a secure look up service.  When a client program wants to connect 
+to a server a look up is performed to find out what Affixes should be put into place. 
+
+The first approach had the bennifit of not requireing an outside service, or the overhead added 
+by advertisements and look ups.  As long as connection establishement is not an issue coordination 
+of Affix stacks in this manner is perferable.  The second approach is, however, the only viable one 
+in many situations. Consider for instance that no direct connection can be established to a particular server.  
+The server can impose a NatPunchAffix that accepts traffic through a publicly reachable forwarder, 
+but the client must some how learn what Affix stack to use in order to connect.  
+\fi
+
+
+The Coordination service implemented in Affix is always placed at the root
+of an Affix tree. It redefines \texttt{listen()} to call
+\texttt{get\_advertisement\_string()}. This returns a serialized description 
+(called an \emph{Affix string})
+of all non-transparent services underneath itself in the Affix tree.
+The address at which it would like to be reached and the Affix string
+with which it can communicate are sent as a key-value pair to 
+a public \emph{advertise service}. Finally, the service invokes \texttt{listen()}
+in the Affix component beneath itself.
+
+When the opposite host calls \texttt{connect()}, the Coordination service 
+queries the advertise service to find the Affix string stored for the 
+given destination address. It then constructs a matching Affix tree beneath itself.
+
+\albert{Fraidy noted: ``What is interesting? notable? about this coordination service?''}
+
+\cappos{I was thinking something similar.   I was also thinking another
+way to spin this is as protocol / service negotiation...}
+
+
+\iffalse
+Thus we implemented the second approach by leveraging an advertise service in order to
+build the CoordinationAffix component which allows the client to do a lookup and build the
+Affix stack the server is using, even if the server is directly unreachable. The advertise
+service we use consists of multiple servers that are available on public domains. The service
+has a redundancy system in order to ensure the service is always available.
+
+The CoordinationAffix on the server side usually lies at the top of the stack and has a view
+of all the Affixes that are in the stack. The CoordinationAffix serializes the stack on the
+server side and advertises the serialized string on the advertise service. The CoordinationAffix
+on the client side does a lookup on the advertise service to retrieve the serialized form of the
+Affix stack. The coordination component than deserializes the Affix stack string and builds
+the new Affix stack on the client side before making any network calls. Note that the 
+CoordinationAffix only serializes the non-transparent Affixes that need to exist on both
+sides of communication in order for the two nodes to communicate properly. Examples of such
+components are CompressionAffix, EncryptionAffix and NatPunchAffix. The CoordinationAffix
+however does not advertise transparent Affixes, such as LoggingAffix, StatAffix and RateLimitAffix.
+\fi

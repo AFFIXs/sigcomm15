@@ -1,0 +1,317 @@
+\section{Architecture}
+\label{sec-architecture}
+
+%Architecture: 
+%  Affix component, Affix stack
+%  how traffic from an application is pushed through the stack until it reaches a network for %
+%      delivery (and an example)
+%  Security model
+
+
+In this section, we review the architecture of the 
+Affix framework, which reflects the
+properties described in Section~\ref{subsec-goals-properties}. 
+Specifically, we describe the 
+structure of an individual \textit{Affix component}
+(Section~\ref{subsec-arch-components}), 
+and how these may be connected so that multiple component operate on 
+a single socket.
+(Section~\ref{subsec-arch-stack}).
+Next, in Section~\ref{subsec-arch-flow},
+we describe how a network API call and the data 
+it returns flows through Affix graphs and network links.
+
+This work is subject to many of the same security issues as prior efforts
+on active networks~\cite{wetherall2002active} and overlay 
+networks~\cite{lua2005survey}.   For example,
+there are issues related to who is allowed to add network functionality,
+how resource and security isolation are performed for untrusted functionality,
+and how the authenticity and integrity of downloaded network functionality
+is assured.  We defer these issues to future work.
+
+\subsection{Affix components}
+\label{subsec-arch-components}
+
+The smallest functional entity that fulfills 
+all of the properties set out in Section~\ref{subsec-goals-properties} 
+is an \textit{Affix component}. 
+An Affix component is essentially an operator that transforms
+an API function, its arguments, and its outcome, i.e.,
+$y = f(x)$ into $y' = f'(x')$ (Figure~\ref{fig-component}).
+Specifically, in the context of the socket API, 
+an Affix component may transform any of the following:
+\begin{itemize}
+\item data payload,
+\item communication endpoints (e.g., IP or port), or
+\item composition of Affix services beneath itself.
+\end{itemize}
+
+
+Any transformation is legal as long as the following 
+conditions for interface compatibility 
+are satisfied: $f$ and $f'$ must be valid 
+API functions, $x$ and $x'$
+must be valid inputs for $f()$ and $f'()$, respectively, and
+$y$ and $y'$ must be possible outcomes for
+the API calls $f(x)$ and $f'(x')$. (The outcome we refer to is 
+not only the return value of the function, but also any effect it has
+on system state.)
+Figure~\ref{fig-fn} illustrates some of these requirements.
+
+\begin{figure}[htb]
+  \centering
+  \includegraphics[width=0.5\linewidth]{figs/fn.pdf} 
+  \caption{A transformation is only legal if
+  the transformed input $x$ is in the set of valid inputs for the API function
+  $f$, and the new outcome $y$ is in the set 
+  of valid outcomes for $f$. For the network API, this means 
+  that the outcome $y$ could have been observed 
+  for $f(x)$ on a correct network.}
+  \label{fig-fn}
+\end{figure}
+
+API calls can be invoked in an 
+Affix component by an application or by another component.
+The call may then be transformed and invoked in another component, 
+or in the network stack of the host \ac{OS}.
+Return values from API calls are transformed and propagated to the 
+caller in the reverse direction.
+
+
+
+\begin{figure}[htb]
+  \centering
+  \includegraphics[width=\linewidth]{figs/component_wide.pdf} 
+  \caption{An Affix component transforms a function and its input and invokes 
+  another component, while returning transformed output
+  to its caller. 
+  }
+  \label{fig-component}
+\end{figure}
+
+
+
+% Fraidy: I prefer to defer this to the implementation section
+%
+% The position of Affix components between the application and 
+% the operating system's network stack 
+% demands that they be compatible with 
+% the socket API interface. This is true for both 
+% the upwards (presenting a socket interface to the application or 
+% Affix component above) 
+% and the downwards direction (interfacing with the socket or 
+% socket-like structure below it). 
+% The Affix component is free in its design of internal workings as 
+% long as it respects interface compatibility.
+
+% In practice, interface compatibility requires that an Affix 
+% component implements interfaces that match the different 
+% groups of operations available on an actual socket, i.e. 
+% address resolution (\texttt{getaddrinfo()}), 
+% connection management (\texttt{listen()}, \texttt{connect()}, 
+% \texttt{accept()}, etc.), 
+% data flow (\texttt{send()}, \texttt{recv()} ...), 
+% and possibly configuration (in the form of socket options).
+
+% In addition to the interfaces required per the socket \ac{API}, 
+% an Affix component must implement a number of Affix-specific 
+% functions for instantiation and configuration, including 
+% ones for combining multiple Affixes. We will discuss these 
+% in an instant.
+
+
+\subsubsection{Special components}
+\label{special}
+
+A particular API call is called \textit{transparent} for a component
+if it  preserves interface semantics itself, without
+requiring the application of another 
+operation. That is, if the component transforms 
+$y = f(x)$ into $y' = f'(x')$, and
+$y'$ is also a valid output of $f(x)$, then $f(x)$
+is transparent in this component. If every API call 
+in a component has this property, then the entire component 
+is transparent. For example, a \textit{RateLimit} service 
+that performs traffic shaping
+can be implemented in a transparent component.
+
+In the socket API, the \texttt{send()}
+ and \texttt{connect()} calls propagate data and associations, 
+ respectively, while the \texttt{recv()} and \texttt{accept()}
+ calls consume these.
+If a propagating API function $f$ is not transparent for a component, 
+then the component must also implement the consuming equivalent function 
+$g$ such that the application of $f$ followed by $g$ 
+preserves interface compatibility -- i.e., that it gives a 
+result that could be observed on a correct network. 
+\cappos{Assuming that a component must `mirror' itself... (see later comment
+in 5.2)}
+For example, if the \texttt{send()} call of a 
+\textit{Compression} component 
+compresses data before sending it over the network, 
+the \texttt{recv()} call of the component should decompress 
+received data before returning it to the application.
+
+
+A component that transforms a propagating 
+call into its consuming equivalent, and vice versa,
+is called a \textit{mirroring} component. 
+Mirroring components also reverse the direction 
+of invocation on their output.
+The network itself is modeled as a mirroring component, 
+as it transforms API calls like \texttt{send()}  
+into \texttt{recv()} calls. Figure~\ref{fig-mirroring}
+shows how the network transforms a \texttt{send()}
+call invoked on one side into a 
+\texttt{recv} call on its other side.
+
+\begin{figure}[htb]
+  \centering
+  \includegraphics[width=\linewidth]{figs/network.pdf} 
+  \caption{The network itself is modeled as a
+  \textit{mirroring} component. It transforms calls 
+  that propagate (e.g., \texttt{send()}) into 
+  calls that consume (e.g., \texttt{recv()}) and 
+  reverses the direction of invocation on its output. }
+  \label{fig-mirroring}
+\end{figure}
+
+
+Other special components include \textit{manager}
+components, which add or remove other components 
+and links between components, and
+\textit{branching} components, which may invoke 
+a function in more than one next component.  
+The \textit{Coordination} service discussed 
+in detail in Section~\ref{subsec-services-coordination} is a manager, 
+and a branching component is illustrated 
+in Figure~\ref{fig-tree} (node $A$).
+
+
+\subsection{Combining Affix components}
+\label{subsec-arch-stack}
+
+% \begin{figure}[htb!]
+%   \centering
+%   \includegraphics[width=0.7\linewidth]{figs/tree.pdf} 
+%   \caption{The set of Affix components operating on one
+%   socket form a rooted tree, with arcs showing the 
+%   invocation relationship between components.}
+%   \label{fig-tree}
+% \end{figure}
+
+
+% Validity of permutations doesn't mean every permutation is meaningful.
+Affix components that act on a single socket
+in an application
+are organized as a rooted tree.
+Every Affix component is represented as a 
+node in the tree, with arcs showing that 
+the source node may invoke calls in the destination node.
+A sample tree is given
+in Figure~\ref{fig-tree}.
+
+When the application calls an 
+API function, the call is handled first by the root node.
+Each node in the tree may transform the call
+and then one or more child nodes. A
+terminal node calls the underlying network API, propagating 
+the function call to the \ac{OS} network stack, which in turn 
+passes data through the network. 
+
+
+% Given interface compatibility towards both the next-higher and 
+% lower layers means that an Affix component need not necessarily 
+% call into the actual \ac{OS} socket, or be called by the 
+% actual application from above. Rather, Affix components can be 
+% situated on top of one another, a setup we refer to as an 
+% \textit{Affix stack}. Through stacking, complex functionality 
+% can be assembled from multiple simple Affix components, an approach 
+% that follows good design practice -- it advertises reuse, and keeps 
+% single Affix components light-weight.
+
+% We required before that the composition of services in a 
+% componentized networking framework must be dynamically modifiable 
+% for it to achieve maximum impact. Each Affix component is therefore 
+% aware that it might live in an Affix stack, and includes functionality 
+% to modify the stack below it. Specifically, an Affix component can 
+% add or remove other Affix components below it to adapt the stack's 
+% capabilities to that of the remote side.
+
+
+
+\subsection{Propagation of API calls}
+\label{subsec-arch-flow}
+
+When connected through the network (which, 
+as described in Section~\ref{subsec-arch-stack}, is itself
+modeled as a component), 
+the Affix components through which data 
+for a particular communication travels make up 
+a graph. This graph includes the Affix 
+tree at each endpoint, as well as those on relays 
+or other middleboxes. 
+Figure~\ref{fig-dataflow} shows an example of an Affix graph.
+
+\begin{figure*}[htb]
+
+  \centering
+    \begin{tabular}{c c}  
+    \includegraphics[width=0.35\linewidth]{figs/tree.pdf}  \hspace{.05cm} &
+  \includegraphics[width=0.6\linewidth]{figs/propagation.pdf}    \\
+  \end{tabular}
+  \caption{(left) The set of Affix components operating on one
+socket form a rooted tree, with arcs showing the 
+invocation relationship between components.}
+\label{fig-tree}
+\caption{(right) This figure shows how Affix components 
+  intercept an API call, transform the data and endpoints 
+  associated with the call, and propagate the call through 
+  an Affix graph until it reaches its destination.}
+\label{fig-dataflow}
+
+\end{figure*}
+
+%      \caption{This figure shows how Affix components 
+%  intercept an API call, transform the data and endpoints 
+%  associated with the call, and propagate the call through 
+%  an Affix graph until it reaches its destination.}
+%  \label{fig-dataflow}
+
+
+%  \caption{This figure shows how Affix components 
+%  intercept an API call, transform the data and endpoints 
+%  associated with the call, and propagate the call through 
+%  an Affix graph until it reaches its destination.}
+%  \label{fig-tree}
+
+
+
+In Figure~\ref{fig-dataflow}, an application on Host A
+calls \texttt{send()} with some data to send and a destination
+endpoint. This figure illustrates the requirements for 
+a path through the Affix graph to satisfy
+end-to-end interface compatibility:
+
+\begin{itemize}
+ \item Any non-transparent call must be followed by its mirror
+ call.
+ \item If a function $f$ that is not data transparent is called 
+ before a function $f'$ that is also not data transparent, then 
+ their mirror functions must occur in the reverse order: 
+ $g'$ before $g$. 
+\cappos{Stray thought: What if the order is fgf?   (I know the answer
+and the reader will too, but we may get this comment from a reviewer.)}
+\item Calls that transform the endpoint associated with a call
+must be transparent end-to-end, i.e., their composition must 
+satisfy the requirements for transparency described in 
+Section~\ref{special}.
+\end{itemize}
+
+
+\input{coordination}
+
+
+
+\input{naming}
+\input{deployment}

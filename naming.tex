@@ -1,0 +1,83 @@
+\subsection{Naming}
+\label{subsec-implementation-discussion}
+
+\cappos{Does this belong earlier?   It ties in well with the deployment
+subsection...}
+
+An important aspect of democratic deployability is the ability to support 
+communication with legacy (non-Affix) clients and servers.   In other 
+words, Affix itself should be democratically deployable.   %To support
+%this, there are several important challenges.
+%\cappos{We likely need to discuss naming before this...}
+However, on the Internet, hosts are commonly identified by 
+a DNS name.   The DNS name is then mapped to an IP address.
+However neither of these serve as a unique identifier
+for a communication endpoint, especially in the presence of NAT boxes.
+If we ignore non-Affix applications for the moment, it would be possible
+to simply have an Affix endpoint use a Affix ID
+as a name in a global registry similar to DNS.   (For scalability reasons,
+such a registry can be implemented as a distributed hash table.)
+The client could look
+up the ID and use the resulting information (such as the serialized 
+Affix stack) to understand how to contact the server.   However, this only
+will work when both the server and client support Affix.
+\cappos{I need your help here.   This text is rough to say the least.}
+
+Applications must work correctly with either a client or a server does not 
+support Affix.   If a server does not support Affix but the client does support
+Affix, then it is trivial for the client to simply contact the server
+without Affix.
+However, an unmodified legacy client 
+must be able to communicate with an Affix server.   If a legacy client knows
+the server's IP or hostname instead of its Affix ID, the client can connect
+to the server.
+%the client does not know how to connect to a server given an Affix ID.
+
+However, in some cases a server is not directly by IP address (eg when
+behind a NAT).
+For legacy clients that use a hostname, it is possible to still support
+Affix by overloading the existing name.  To do this, a service called 
+Zenodotus maps every
+Affix ID to a valid DNS name.   A client using a Zenodotus name
+(ending in {\tt zenodotus.[anonymized].org}) and it is resolved to an
+IP address where the client may contact the server. 
+%For example, in Figure~XXX(a), a webserver wants to support compression
+%for Affix clients while also supporting legacy clients.   Legacy
+%clients will look up the webserver's DNS name and contact it on 1.2.3.4, port
+%80.   However, Affix clients will lookup the Affix ID and find that the
+%server supports compression on port 8000.   An Affix enabled client can take
+%advantage of this support.
+%
+%Note that the Affix ID for a server need not refer to the host's IP address.
+For example, in Figure~XXX, a server behind a NAT is contactable by 
+providing the
+relay's IP address to legacy clients.   In this example, Affix clients are 
+able to connect to the server.   Additionally, clients that support
+Affix will benefit from compression and encryption while communicating
+over the relay.
+
+%Given a portion of the address space to map names into (such as exists in 
+%IPv6), Affix could also support legacy clients that use IP addresses
+%instead of hostnames.
+%\cappos{Is this too tangental?}
+
+
+
+%A legacy client can use the DNS name
+%to uniquely refer to the server.  Zenodotus will resolve this to
+%an IP address that a legacy client can use to communicate with the server
+%(Figure~XXX).   This 
+%Affix components that are transparent to the client.
+%XXX
+%
+%However, a server may have different services running on different ports.
+%If the same hostname is used, then the same public relay must be used
+%for all ports on the server.   This may be less than ideal because different
+%applications / flows may want to relay through different systems.   To
+%mitigate this, the XXX
+
+
+
+
+\cappos{I'm intentionally dodging ports / protocols because I think it muddies
+the water too much.}
