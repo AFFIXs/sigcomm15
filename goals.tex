@@ -1,0 +1,561 @@
+\section{Goals}
+\label{sec-goals}
+
+In this section, we describe in greater detail the aims of 
+the democratic deployment model, the limitations
+of current deployment approaches, and the specific 
+properties that are required for a componentized 
+framework to overcome these limitations and support these aims. 
+
+\subsection{Key principles of democratic deployment}
+
+The key principles of the democratic deployment model 
+are
+\begin{enumerate}
+\item Anybody can develop and distribute 
+a new service that operates on networking
+traffic.
+\cappos{We should say something more / different here.   Whose traffic?   
+How are they permitted to do so?   Couldn't they do this with OS changes, etc.?
+}
+\item Anybody can apply an arbitrary combination of services
+to network traffic entering and leaving their own device, without 
+having to ascertain manually that the other devices they communicate 
+with have the same combination of services. 
+A service should be usable during a communication 
+if it is supported at corresponding communication endpoints, 
+independent of the status of any other services.
+\end{enumerate}
+
+The first principle is satisfied by recent developments
+in SDR, SDN, openly available networking research infrastructure, 
+and other componentized networking services 
+(as described in Section~\ref{sec-introduction}). 
+To the best of our knowledge, however, the second principle
+has not been addressed by previous work.
+
+\subsection{Limits of current deployment models}
+\label{subsec-goals-limits}
+
+
+In a democratic deployment model, anybody can contribute a 
+new service operating on network traffic, and anybody can 
+deploy that service on their own device(s).
+This requires certain kinds of flexibility that do not 
+exist in current deployment models:
+\begin{itemize}
+  \item A service should be independently deployable by any agent: 
+  an end user, network service provider, content provider, 
+  or application developer.
+  \item It should be possible to coordinate interoperability 
+  between services at two endpoints
+  when communication is established, 
+  without prior configuration.
+  \item A service should be applied or not applied based on the 
+  requirements of an individual communication flow, rather than
+  at the level of an entire host, service, or traffic type.
+  \cappos{Why is this a limitation?}
+  \item Services should be composable, so that users can 
+  potentially benefit 
+  from multiple services (though not 
+  every combination is necessarily useful).
+\end{itemize}
+
+
+
+In practice, networking services are at best designed 
+to support \textit{incremental deployment}. This generally involves 
+some combination of the following strategies 
+to allow communication between hosts 
+with different networking services enabled: 
+\begin{itemize}
+\item Set required capabilities a priori, and communicate
+only with those that have compatible capabilities.
+\item Engage in a predefined protocol negotiation 
+procedure with each new communication endpoint
+to choose a mutually compatible protocol from a list.
+\item Use a proxy that translates between  
+protocols (e.g., a SPDY to HTTP gateway).
+\item Fall back to a legacy or ``lowest common denominator'' state
+when communicating with endpoints that do not support 
+a new functionality.
+\end{itemize}
+
+Incremental deployment does not address \textit{who}
+can deploy a service, a key component of the
+democratic deployment model.
+Furthermore, while these strategies can provide a means 
+for incremental deployment of a single service or library, 
+ensuring interoperability between two hosts with
+multiple networking services 
+is much more difficult. 
+The componentized 
+networking frameworks we have seen 
+leave it up to developers of individual components
+to ensure compatibility, 
+an approach that is generally insufficient if multiple parties
+are allowed to deploy services.
+
+To meet the goals described above
+for democratic deployability, we
+argue that three properties -- interface compatibility,
+permutability, and dynamic addition and removal of services -- are necessary. 
+In Section ~\ref{subsec-goals-properties},
+we describe these properties in greater detail.
+
+
+\subsection{Required properties}
+\label{subsec-goals-properties}
+
+\cappos{While reading, at this point I'm wondering how this integrates with
+an application...}
+We have identified a sequence of 
+properties that enable
+practical democratic deployment of networking 
+services, fully satisfying the goals described above.
+The three 
+properties -- interface compatibility,
+permutability, and dynamic addition and removal of services -- 
+are hierarchical,
+so that a property is satisfiable only if the previous
+property is fulfilled. 
+
+
+When these properties are satisfied, it is possible 
+for services developed within the framework 
+to ensure interoperability with a legacy host and 
+network, or with another composition of services.
+\cappos{This is the first mention of legacy, I believe.   Should we state
+this earlier?   (It is alluded to earlier, but the word choice here grabs
+the attention)}
+It may therefore be deployed by an end user, 
+network service provider, content provider, 
+or application developer, 
+with the assurance that it will not preclude communication 
+with any other host regardless of the services 
+supported by the peer. 
+
+
+
+% synctactic vs semantic composability
+
+
+%\begin{figure*}[t]
+%  \centering
+%  \begin{tabular}{c c c c c c}  
+%  \includegraphics[height=24mm]{figs/ifcompat1-crop.pdf} \hspace{.05cm} &
+%  \includegraphics[height=24mm]{figs/ifcompat2-crop.pdf} \hspace{.05cm}  &
+%  \includegraphics[height=24mm]{figs/permut1-crop.pdf} \hspace{.05cm} &
+%  \includegraphics[height=24mm]{figs/permut2-crop.pdf} \hspace{.05cm}  &
+%  \includegraphics[height=27mm]{figs/dyn1-crop.pdf} \hspace{.05cm} &
+%  \includegraphics[height=27mm]{figs/dyn2-crop.pdf} \hspace{.05cm}  \\
+%    (a)  & (b)  & (c)  & (d) & (e) & (f)   \\
+%\end{tabular}
+%  \caption{These figures illustrate the properties 
+%  described in Section~\ref{subsec-goals-properties}. 
+%  (ToDo: write caption and mention figures in text)  }
+%  \label{fig-properties}
+%\end{figure*}
+
+\subsubsection{Interface compatibility}
+
+A networking service satisfies \textit{interface compatibility}
+if it is syntactically and semantically indifferentiable
+from the interface of a legacy network stack on a feasible network.
+
+
+To minimally support incremental and democratic deployment,
+a networking service should not require changes to 
+the code base of the applications or operating systems 
+that send data through it.
+This requires syntactic compatibility,
+which in most current operating systems means that the service 
+should expose an interface that implements
+the same function calls and parameter passing mechanisms as
+the Berkeley/BSD socket API.
+
+An oft-overlooked requirement for full interface compatibility 
+is semantic compatibility (i.e., the behavior, rather than the 
+syntax, of the calls must be compatible).
+To satisfy semantic compatibility, an input that 
+is in the domain of validity of an API
+must be valid input to the service, and every output of the service
+must be a valid output of the compatible API.
+
+For the socket API, this means that the output of the service 
+must be an output that \textit{could be observed} on a correct network.
+This does \textit{not} mean that the service must return the same
+result as the legacy networking stack would. For example, 
+a mobility service can make it appear to a socket as if 
+it is connected to a single network throughout its lifetime even
+though it has changed network associations several times. 
+This does not violate semantic compatibility because
+the behavior could be observed under static network conditions.
+Furthermore, a service may change interface semantics - for example, 
+by encrypting the data associated with a network call - as long as this 
+change is reversed by a matching service on the other side of the 
+communication flow, so that higher layers \cappos{, such as the application,}
+observe a fully compatible interface.
+% Furthermore, the semantics of an action must not be ambiguous - 
+% that is, a given action should have a clearly defined 
+% set of allowed outcomes.
+
+\cappos{suggested edit: cut the rest of this subsection}
+A networking service that violates semantic
+compatibility is liable
+to cause applications or other networking services 
+to fail as a result of incorrect results from socket API calls, 
+and may in turn fail as a result of incorrect input.
+Some examples of semantic violations that may be incurred by networking calls include:
+\begin{itemize}
+    \item Multiple sockets actively {\tt listen} on the same address without error, 
+    and incoming connections are seen on one or more socket.
+    \item An empty string is passed as the hostname parameter to {\tt getaddrinfo} 
+    and results are returned for the loopback interface.
+    \item A new socket is returned by {\tt accept} and does not 
+    inherit file status flags such as {\tt O\_NONBLOCK} from the listening socket.
+\end{itemize}
+
+All of the semantic violations listed above 
+have been observed in the wild when networking libraries, 
+programming languages, or operating systems
+implement network communications without sufficient attention to 
+interface compatibility.
+They have caused significant 
+security and reliability problems in widely used applications and software 
+libraries (including 
+Python~\cite{CapposPythonBug1,bug13,bug05}, 
+Twisted~\cite{bug37}, OpenSSH~\cite{bug15}, ntpd~\cite{bug16}, 
+Java~\cite{ipv6-java}, Ruby~\cite{bug19}, 
+Cygwin~\cite{bug20}, Eclipse~\cite{bug21}, Mono~\cite{bug33,bug22}, 
+and OpenVPN~\cite{bug25}).
+
+
+
+\subsubsection{Permutability}
+
+The second required property, \textit{permutability}, states that
+\emph{any} order of components will still return a valid
+(i.e., interface compatible) result.
+
+Without permutability, certain orders of components 
+will violate interface compatibility and will not run,
+or will run and produce unexpected outcomes.  Some examples of this 
+that have been observed in the wild include:
+
+\emph{MTU black hole problem}. Many networks do not carry ICMP messages end-to-end. 
+This is problematic when they carry VPN traffic, for  
+which an extra header increases the size of network packets. 
+Because the network suppresses ICMP messages, MTU path 
+discovery fails, and the network becomes an ``MTU black hole''
+which small packets successfully bypass, but which consumes large packets.
+
+\emph{FTP traffic cannot be encrypted behind a NAT}.
+Some NAT devices will rewrite the data payload of FTP traffic 
+to allow devices behind a NAT to use FTP. However, this breaks when used together 
+with encryption libraries.
+
+%\emph{Using Cygwin with a firewall}.
+%Developers of emulation libraries like Cygwin and Wine report that these often
+%fail or have other unexpected behavior when used together with firewalls 
+%that change the network semantics.
+
+
+This property is not satisfiable if any single component
+is not interface compatible, which means that every 
+component must implement the entire, undivided interface. 
+Some componentized systems have components that present different 
+interfaces at different layers, or that have specific dependencies. 
+In these systems, if two systems have all but one service 
+in common but that component is a dependency for the others, 
+they must remove all of the components in order to communicate 
+successfully. 
+In a framework where permutability is satisfied, however,
+components can be ordered in any way 
+and removed or added individually without risk.
+
+
+
+Permutability does \textit{not} require that any order of services
+yield the same result. Compression followed by rate limiting
+is different from rate limiting followed by compression; 
+but the result of either 
+permutation can still be interface compatible.
+
+
+
+\subsubsection{Dynamic addition and removal of services}
+
+The final property, 
+\textit{dynamic addition and removal of services}, 
+states that the composition of services   
+can be manipulated during runtime. 
+This is an obvious requirement for democratic deployment:
+we must be able to safely manipulate components once the connection 
+has been initiated, so that if one entity deploys a 
+service that is not matched on the other endpoint, 
+it can be removed, or the missing component can be 
+deployed on the other endpoint.
+
+
+%In particular, to meet the goals described in 
+%Section~\ref{subsec-goals-limits}, this 
+%should include the ability to manipulate services 
+%individually. For example, 
+%if one endpoint initiates a connection and is using 
+%a composition of two services, and 
+%its peer only supports one of the services,
+%the first endpoint can remove the incompatible 
+%service from its configuration on-the-fly and still benefit from the use of
+%the compatible service. Similarly, if a service is available
+%on a middlebox that processes traffic between two endpoints, 
+%but is only available on one of the endpoints, it
+%should be possible to enable the service on the link between 
+%one endpoint and the middlebox.
+
+This depends directly on permutability
+With the assurance that any permutation of components
+is correct, components may be added, removed, and reordered
+without fear that a particular composition
+will break interface compatibility and cause incorrect results.
+
+%With this property, a networking service 
+%within a componentized framework can 
+%ensure its compatibility with a legacy host and 
+%network, or with another composition of services.
+%However, because each property depends on its predecessor,
+%all three are required.
+
+
+
+
+
+
+\iffalse
+
+% Mostly lifted from Justin's CAREER proposal
+The academic literature includes many proposals and prototype implementations 
+of techniques that claim to add functionality to legacy applications 
+These include overlay networks, client-side interposition through a proxy, or 
+componentized network protocols. The prevailing wisdom is that 
+these systems would not only provide benefit to applications, but would 
+also be transparent and easy to deploy in a widespread manner.
+
+Practical experience has proved otherwise. Our frustrations with building a 
+component system of our own taught us that the realization of a true system 
+of composable libraries for adding network functionality is immensely challenging 
+and requires new concepts and techniques. 
+
+In this section, we describe the key concepts involved in the design of 
+a componentized networking architecture that overcomes 
+the limitations that plague previous attempts in this area.
+Namely, we discuss the necessary requirements for such an architecture to
+support useful functionality at the socket API layer (Section~\ref{subsec:overview-layer}), 
+be highly portable (Section~\ref{subsec:overview-portability}),
+and be truly transparent to other components and to applications 
+(Section~\ref{subsec:overview-semantics}).
+Section~\ref{subsec:overview-affix} closes
+with a brief description of AFFIX, the platform we have built that embodies these principles.
+Later sections will 
+describe various details of this platform, including: 
+the operation of individual AFFIX components (Section~\ref{sec-overview}), 
+composition of components (Section~\ref{sec-shimstack}),
+and paths for deployment with 
+unmodified networks and applications (Section~\ref{sec-add-application}).
+
+
+\subsection{Programmability at the Socket API Layer}
+\label{subsec:overview-layer}
+
+\albert{Selectively quoting Fraidy: ``we need to explicitly state somewhere why it is useful to 
+add functionality at this layer''}
+
+%An obvious prerequisite for the adoption of software-defined sockets is that it must be 
+%capable of supporting useful kinds of functionality. 
+The technologies that inspired this work, SDR and SDN, enable programmability at 
+lower layers of the network stack, which is traditionally where new protocols
+and technologies are implemented.
+This is partly because many classes of advanced networking 
+techniques
+are much faster, more secure, or more capable when implemented 
+at a lower layer of the network stack. 
+
+However, there are many useful techniques 
+that can be implemented with good performance at the level of the socket API, 
+and there exists a huge body of work to support this assertion [many cites]. 
+There is also some benefit to encapsulating within the socket API techniques 
+that are faster to perform at lower layers or in hardware, such 
+as compression or encryption, because they can be applied in a fine-grained 
+manner when implemented at this level.
+
+Above the socket API, we find that techniques that are implemented 
+within the application are better 
+placed to interact with the network and the application in a dynamic manner.
+Unfortunately, coupling network functionality and application logic makes 
+applications more complex and difficult to debug.
+Application developers are often unwilling to implement some network functionality 
+in an application, even though it would improve performance, because it would 
+make the application too unwieldy to maintain.[Cite the VLC FEC bug]
+
+
+\subsection{Portability}
+\label{subsec:overview-portability}
+
+A key goal of this work is to support heterogeneous device types, network settings, 
+and applications. To work properly, a software-defined sockets framework must ensure 
+that injected functionality will behave identically on every supported platform.
+In practice, this is a difficult task.
+
+Our work with software-defined sockets was motivated by our experiences trying 
+to support nodes in a global distributed testbed~\cite{Seattle_SIGCSE09} comprising 
+end user devices including servers, desktops, laptops, tablets, and phones.
+These devices experience diverse network conditions with mobile nodes, 
+nodes behind NATs or organizational firewalls, and low-bandwidth nodes.
+
+This heterogeneity made the task of writing portable software supported on every testbed node 
+immensely challenging. There is no truly `write-once, run anywhere' interface in 
+widespread use today. In fact, allegedly portable APIs contain many subtle differences 
+in behavior between implementations. These \emph{semantic violations} - behaviors 
+that could not be a valid API response to a sequence of calls - cause significant 
+security and reliability problems in widely used software (such as Python, Twisted, 
+OpenSSH, ntpd, Mozilla, Java, Ruby, Cygwin, Eclipse, Mono, Go, and OpenVPN).
+Many issues caused by semantic violations are not discovered in routine testing because they occur 
+only under particular network conditions. Depending on the situation, an application 
+may (unwittingly) end up received truncated UDP datagrams, certain packets may be 
+lost or filtered, and options may not be obeyed causing applications to act 
+erratically or insecurely. Semantic violations can affect not only the application 
+that introduces them, but also others on the same or another host. For example, 
+a firewall application that violates semantics of the socket API may cause other 
+applications to fail when their socket operations produce incorrect results.
+
+In order to ensure identical behavior on every target environment, therefore, 
+a software-defined sockets framework must avoid any semantic violations - 
+a property we call \emph{semantic consistency}.
+
+\subsection{Transparency and Composability}
+\label{subsec:overview-semantics}
+
+Semantic consistency is essential to composability and transparency to applications, 
+as well as to portability.
+A software-defined socket component that violate semantics is liable cause 
+applications or other components above itself 
+to fail as a result of incorrect results from socket API calls. 
+
+In practice, application developers often encounter this phenomenon 
+when trying to use multiple libraries in a composed manner, so that the 
+output of one library call is passed to a call from another library.
+For example, consider the steps required for an application developer  
+to support mobile devices whose physical location and IP address may 
+change frequently, possibly to a network behind a NAT.  
+To use both mobility and NAT libraries concurrently, in addition to porting the 
+application to use the mobility library, the developer also must port the 
+mobility library to use the NAT library. The crucial reason for this is that 
+the libraries do not preserve exactly the semantics of the interface directly 
+below themselves.
+
+
+Notably, past work in the area of 
+composable network tools [cites TESLA, Click?]
+has not been concerned with preserving semantics, and as a result these are 
+not strictly composable or transparent to applications in all cases. [cites from click 
+mailing list]
+
+Unfortunately, testing for the correct behavior of an API is a deceptively difficult 
+task. This is especially true of a socket API, for which correct behavior is defined 
+as the valid result of a sequence of calls across \emph{multiple} hosts.
+Further discussion of the idea of semantic consistency as it relates to a
+software-defined sockets framework and a discussion of the 
+specific techniques used to validate the semantic consistency of our 
+platform is deferred to Section~\ref{sec-overview}.
+
+\subsection{AFFIX platform}
+\label{subsec:overview-affix}
+
+The software-defined sockets platform that we have developed, \emph{AFFIX}, 
+is designed to address the issues described in this section. 
+It comprises small, lightweight components 
+called \emph{shims}, whose operation is described in Section~\ref{sec-overview}. 
+These may be combined to form  
+\emph{AFFIX tree} which push API calls through a series of AFFIX components,
+so as to apply multiple pieces of functionality.  AFFIX trees are described 
+further in Section~\ref{sec-shimstack}. 
+
+
+\iffalse
+To better illustrate how shims are useful, consider the following scenario.  Suppose we start with a simple video chat application, and Alice, a world traveler, wants to video chat with Bob using her smartphone when riding a bus on a rural highway. Although her smartphone shows that cellular connectivity is available, the link is extremely lossy. Packets are constantly getting dropped, causing multiple retransmission attempts and stalling application progress. As a result, Alice's connection has terrible quality.   The developer of the video chat software gets feedback from Alice about the poor quality of her call, and decides to add support for forward error correction (FEC), 
+%Forward error correction or FEC adds redundant bytes to tolerate network losses, and is 
+a popular technique used to reduce losses in wireless networks~\cite{fec_wireless1, fec_wireless2}. However, this not only requires changes to the client, but also requires the server code to changes.   
+%In addition, the server and client need to coordinate use of FEC so that they both understand when it is being used and with what settings. This is a non-trivial change, especially for applications where the client and server code are maintained by different developers (i.e., web browsers and servers).
+
+Now, suppose Bob, who happens to be a journalist, is visiting a country with severe Internet restrictions, and wants to communicate anonymously with his video chat program using a system like Tor~\cite{tor}. The developer decides to add support for Tor, although ensuring an application of this sort securely routes traffic over Tor is a non-trivial undertaking~\cite{tor_skype_complexity}.   After significant effort, the application developer may now support Tor.
+
+While the application developer has now expended time and energy to support libraries for both FEC and Tor, they cannot be used together.   For the application developer to support FEC while also supporting Tor, one network library must be ported to the other.   Depending on whether the FEC is end-to-end or only for the first hop will influence which library's network interface needs to change. If FEC sits on top of Tor (and thus is end-to-end), then the FEC library needs to be changed to call into Tor using the API it provides.  If FEC is desired on the connection to the first Tor relay, then the Tor library must instead call the FEC library.   This also requires the Tor developers to add support to their relay code for FEC. 
+
+\subsection{Design Goals}
+
+The previous example illustrates some of the key problems we address in shims.  First, the semantics of the network interface change when a new library is added, making development and debugging very difficult.  Second, adding support for one library at a time is not enough, since the devices commonly need the ability to use several different libraries concurrently.   Supporting multiple libraries should be seamless and not require application changes.   Third, many pieces of network functionality require coordination on both ends of the network link, such as encryption and decryption, compression and decompression, and error correction and error recovery.  In these cases, multiple pieces of software will need to be modified, and both ends of the connection agree on what functionality should be used.   If one end is expecting encrypted data while the other is not, the application will not work.   We elaborate on each of these principles in the following paragraphs.
+
+\subsubsection{Semantic-Consistency}
+\label{sec-semantic-consistency}
+The crucial reason why adding new functionality to applications is not always transparent has to do with semantics.   Most widely used network APIs consist of a series of calls, arguments, and return values.   If any of these differ from the expected behavior of the developer, either as a result of adding new calls or changing the meaning of return values, the developer must change their code to match.   One might expect then that merely mimicking the function arguments and asserting the return values is adequate to validate semantic-consistency.  Unfortunately, it is more complicated than this for several reasons.   
+
+%\begin{itemize}
+
+%\item 
+{\bf Inherent semantic variance.} First, the semantics for APIs like
+POSIX inherently vary from system to system~\cite{BSDLinuxDiff, 
+demmer2007towards, CapposPythonBug1, NonBlockingDiff, BSDCompat, 
+SOLINGERSemantics, REUSEADDRSemantics}.   For example, if a
+non-blocking socket accepts a connection, whether the non-blocking flag is
+propagated is system specific and differs from Linux to Mac OS X.   As a
+result, programmers will assume one API behavior and this will result in 
+problems, even in widely used software~\cite{CapposPythonBug1}.   When
+using a library, the documentation is often lacking.   The 
+programmer is unlikely to know whether the library differs.
+
+%\item 
+{\bf Hard to mimic underlying semantics.} Even if the library programmer
+knows what behavior is expected, it can be complicated to mimic it.   For
+example, suppose a library is intended to compress data that is sent over a
+TCP stream.   For efficiency, the library may want to compress chunks of
+data.   However, the library programmer does not know how much data
+will be accepted by the underlying OS for delivery.   As a result, to
+maintain semantics, the library programmer must either buffer data (sending
+in a thread to ensure data delivery) or use some sort of signaling protocol
+to mark data as valid or invalid depending on the application's
+retransmission of the same bytes after the previous send fails.   
+
+%\item 
+{\bf Difficult to precisely control application-perceived semantics.}
+Many libraries operate at a different level of abstraction than the
+application, such as operating on packets.   This makes it easier to
+perform certain types of network functionality.   However, it can be much
+more complicated to retain consistent semantics when interacting at a
+different level of functionality because the resulting operations will be
+interpreted by the operating system and possibly other pieces of software
+before being delivered to the application.
+
+%\end{itemize}
+
+
+%First, the semantics for APIs like POSIX inherently vary from system to system~\cite{BSDLinuxDiff, demmer2007towards, CapposPythonBug1, NonBlockingDiff, BSDCompat, SOLINGERSemantics, REUSEADDRSemantics}.   Second, many behaviors of the network API are dependent on the order of function calls.   For example, in the Berkeley/BSD socket API, most calls behave differently depending on the socket type and blocking/non-blocking status.  Third, since the programmer's use of the API is predicated upon their understanding of the state of the system, any library that needs to mimic this behavior must also track all applicable state.   Lastly, many libraries operate at a different level of abstraction than the application, such as operating on packets instead of messages.  Retaining consistent semantics in this case is difficult because resulting operations are interpreted by the operating system and possibly other pieces of software before being delivered to the application.
+
+These lead to practical problems with semantics in practice.
+Semantic-variance is sometimes dismissed as an `implementation detail'.
+The reality is that they pose a practical barrier to adding network 
+functionality to applications.   By ensuring semantic-consistency in shims, one key benefit to developers is that the {\it application does not need to be modified} to add network functionality.  Furthermore, there is {\it exactly one correct outcome} of any networking system call.  This makes it easier to support execution in different environments and platforms.
+
+\subsubsection{Easy Library Composition} 
+It is not optimal or realistic to only add one library at a time to modern applications.   There are many libraries that are useful in concert.  For example, Skype may use FEC, compression, encryption, overlay routing, rate limiting, rate detection, NAT traversal and other libraries in concert to optimize call quality.  However, debugging the composition of several libraries with varying semantics is very challenging.   When an error occurs, the root cause can be masked or misinterpreted by any of the libraries that are being used by the application.   As a result, to effectively debug the application, one needs also to fully understand the semantics of all libraries in use.   This places a large burden on the developer to delve deep into the library details and network behavior.
+
+Since all shims are semantically-consistent, our framework provides developers with a way to easily use multiple shims simultaneously.  And while debugging multiple libraries at once is still not trivial, the problems are no longer obscured by varying semantics.  In addition, the shims framework includes implementations for several widely used network functions, thus making it easier for developers to use multiple shims in their applications.
+
+\subsubsection{Matching Functionality}
+Many types of network libraries, like compression, encryption, and FEC, require coordination between multiple parties (i.e., both sides of a connection).   This requires both the server and client software to be modified to support the functionality.  While this is straightforward in peer-to-peer applications, many applications consist of server and client portions that are interoperable and are maintained by different developers.   For example, there are many different web browsers and servers that support different functionality.  Getting a piece of functionality to be supported requires the cooperation of server and browser software developers.   Apache has had support for compressing HTTP data for several years.   However, the developers responsible for many popular browsers have not added functionality to support this.   
+
+To \textit{coordinate} the balancing of shims, we use a special coordination shim.  We expect that most practical deployments will include this shim at the top of every shim stack.   The coordination shim serializes all other shims in the stack, and places this information into a \emph{global naming service} (described in detail in Section~\ref{sec-shimstack}).  Thus the shims framework automatically ensures matching functionality on both sides of a network connection.
+
+%Even when the requisite parties have support for a feature, they must somehow decide whether or not to enable it.   This is commonly done by one of two techniques.  The first method is to modify the communications protocol to support the transmission of metadata that indicates which libraries are in use.   This can break compatibility if the protocol was not designed to transmit metadata.   The second method is to have the user set up the software on both sides of the connection, commonly on different ports.   The user is then implicitly responsible for indicating what libraries are in use by the settings they indicate.   The use of separate ports can make it challenging to simultaneously support many different arrangements of functionality.   For example, if there are 4 libraries that can be composed in any order and the user wants a unique port for any combination of libraries, this would require 64 different ports.
+\fi
+
+\fi
