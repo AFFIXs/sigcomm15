@@ -1,0 +1,672 @@
+%!TEX root = paper.tex
+\section{Implementation}
+\label{sec-implementation}
+
+%Implementation: 
+%  why it's written in repy (especially, how repy helps encourage interface compatibility) 
+%  The API including the required calls that a component must implement
+%  How a component can manipulate those beneath itself
+%  How one uses Affix (native in Python/proxy)
+%  Deployment paths (see figure)
+
+In this section, we describe the implementation 
+of the Affix platform, a componentized networking 
+framework which embodies the goals 
+described in Section~\ref{sec-goals}.
+Affix allows researchers and developers to create components
+that implement networking services, and distribute them to 
+end users so that they may be deployed in a democratic fashion.
+We describe the design considerations involved in the 
+implementation of the platform (Section~\ref{subsec-design}), the general 
+structure of the Affix implementation (Section~\ref{subsec-affix}), 
+the democratic deployment paths available 
+with this implementation (Section~\ref{subsec-deployment}), 
+and selected issues that had to be addressed for Affix to work 
+unmodified on the current Internet (Section~\ref{subsec-implementation-discussion})
+
+\subsection{Design considerations}
+\label{subsec-design}
+
+Several tradeoffs were involved in the design 
+of the Affix implementation. In this section, 
+we discuss the considerations 
+underlying our choice of network API and
+level of operation.
+ 
+\subsubsection{Network API}
+
+Affix supports interface compatibility with respect to 
+the Repy V2 networking API~\cite{RepyV2API}.
+Repy V2 is a language developed for the Seattle testbed
+that is conceptually similar to the 
+Berkeley socket API. The legacy socket API, however,
+is ambiguous in certain cases, and therefore has 
+different semantics on different platforms \cappos{cites here}. 
+Repy V2 is designed specifically with interface 
+compatibility in mind, so that the semantics 
+of each call are identical  
+regardless of platform.   
+
+This choice is necessarily restrictive. Since not all 
+network API calls are supported on all platforms, 
+Repy V2 only includes a subset of calls that can be 
+made to behave identically on every major \ac{OS}.
+This tradeoff is necessary in order to support 
+interface compatibility.
+\cappos{This is true assuming you don't want to restrict components to an
+OS or require every component author to support the quirks of all OSes.}
+
+
+%While full interface compatibility on one platform prevents a service 
+%from passing invalid output to applications on that platform,
+%for a networking service 
+%to reach the widest audience possible, it should be fully 
+%portable across different operating systems and platforms. 
+%This means that certain platform-specific functions, 
+%or functions with different semantics on different platforms,
+%may not be supported. However, we consider the elimination
+%of the effort required to port a service to a new platform or OS 
+%to be well worth this cost.~\ffund{I moved this 
+%text here because it seems like it'll belong here, once 
+%we fill out this section.}
+
+\subsubsection{Implementation at the socket API level}
+
+Some classes of networking 
+services are indeed faster, more secure, or more capable when implemented 
+at a lower layer of the network stack. 
+However, there are certain distinct advantages to 
+operating at the level of the socket API.
+In particular, we argue that certain properties of 
+this layer make it more amenable to rapid deployment
+of networking services. In this section, we 
+describe these properties in more detail.
+
+\paragraph{Leveraging application intent}
+\label{subsubsec-intent}
+% by sitting close to application layer, we can take 
+% advantage of what the application "knows" about 
+% its preferences. 
+%End to end argument~\cite{saltzer_endend_1984}
+\cappos{This is interesting, but I wonder how related it is.   I feel this
+point (especially this paragraph) can be trimmed.}
+Services situated at lower layers 
+commonly make use of information that is lost
+as data rises to the top of the network stack (e.g., 
+using wireless link quality for handover decisions, 
+or link layer loss statistics for congestion control 
+at the transport layer).
+A similar approach exists for
+services operating at higher layers.
+Recently, we have seen abstractions such as 
+Intentional Networking~\cite{higgins_intentional_2010}
+and Socket Intents~\cite{socketintents_2013} 
+which enable networking services to use information 
+that is gained by being close to the application.
+
+While these examples extend the socket API to more fully support the 
+explicit expression of application intent, other implicit expressions of intent 
+may be understood just by intercepting socket API calls before they are passed 
+to the operating system. Examples of such expressions include the hostname
+used to identify an endpoint and the flags passed to a socket API call.
+Furthermore, when operating directly at the interface between the application
+and the network stack, we can also influence how the application perceives
+the network by tailoring the socket API error codes that are raised to the 
+application. 
+\cappos{You want to make it clear that this is useful for supporting apps
+without modification.   That tie in is clear to me but may be missed by
+some readers.}
+
+\paragraph{Fine-grained application}
+Networking services at lower layers generally require 
+either static configuration policies
+or reactive adaptability to network conditions
+to determine whether a service is engaged for a given 
+communication flow. By operating at the socket API layer, 
+we gain the ability to apply functionality 
+on a per-socket basis.
+
+
+\paragraph{Operation in userspace}
+Because it runs above the 
+operating system's network stack, a socket API-level service 
+can be implemented completely in userspace. Although
+userspace services can incur a performance penalty, 
+they may also be installed and operated without superuser 
+privileges in many cases. As processing power becomes 
+increasingly inexpensive, the performance gains associated 
+with operating in the kernel or in hardware become 
+less necessary and the relative benefit of allowing deployment 
+by unprivileged users becomes more significant.
+
+
+\iffalse
+\paragraph{Support for legacy applications, hosts, and networks}
+To encourage deployment, a service should not require
+changes to the code base of an application, the operating system 
+of an end host, or the devices and links that make up a network.
+By operating outside of these entities, a socket API-level service 
+loses the opportunity to leverage application-specific 
+or network-specific context (except for the kind 
+of context described in Section~\ref{subsubsec-intent}).
+However, this enables it to support oblivious applications, 
+hosts, and networks, as required for democratic deployment.
+\fi
+
+\subsection{Implementing an Affix Component}
+\label{subsec-affix}
+
+The Affix software release includes the Affix framework -- the infrastructure 
+necessary to construct and send traffic through an Affix tree -- 
+as well as a set of core components.
+
+Affix components implement new functionality as follows.
+Each Affix component overloads the network API calls in the 
+Repy V2 API, which includes all the functions necessary to initiate, 
+connect, and send and receive data through a TCP or UDP socket.
+The logic for a new network service is implemented inside
+these overloaded functions.
+A component that does not tranform a particular call simply 
+invokes the same function 
+with the same arguments in its child.
+
+
+Each component is also required to define a \texttt{copy()}
+call and a  \texttt{get\_advertisement\_string()} call.
+These functions are necessary for managing and 
+coordinating the Affix graph..
+The \texttt{copy()} function makes a complete 
+copy of the component itself, 
+including any relevant configuration options.
+The \texttt{get\_advertisement\_string()} must give 
+all the information necessary to mirror the component.
+For a transparent component, this function usually 
+returns an empty string; for non-transparent components
+it typically 
+\cappos{This seems to imply components do not always mirror themselves.}
+describes its own name and configuration.
+
+
+The Affix framework itself includes functions to construct a tree,
+observe a subtree, add or remove arcs from the tree. 
+The direction in which these functions may be invoked is the 
+same as the direction in which network API functions are 
+invoked. Thus, a component may construct 
+a new subtree and add an arc from itself to that tree;
+but it may not, e.g., remove the link between itself and its parent.
+These functions enable the construction of an Affix graph 
+at connection time (i.e., the property of dynamicity), 
+so that interoperability can be ensured without prior agreement
+ between endpoints.
+
+
+ \iffalse
+
+
+Affix components are built on top of the Repy API and thus must implement
+all the network API calls~\cite{RepyV2API} from Repy that are semantically consistent with
+the API. The framework provides an Affix component called \textit{BaseAffix}
+which defines all of these API calls along with some extra internal API calls.
+Every Affix component that is built, should inherit the BaseAffix class 
+and may overload any of these network API calls. 
+
+In addition to the network API calls, each Affix component must overload the
+two API calls: copy() and get\_advertisement\_string(). The function
+copy() must make a copy of the Affix component itself, copying over any values
+and variables that is relevant to the Affix component. The call get\_advertisement\_string()
+returns a representation of the Affix component as the component wants to be seen. The Affix
+component may include any data in this advertisement string as it wishes to. Most 
+transparent Affix components such as LogAffix or StatAffix will return an empty string.
+This advertisement string is used mainly by the CoordinationAffix to balance 
+the Affix stack on both sides of the communication. More details on the CoordinationAffix
+is provided in Section~\ref{subsec-services-coordination}.
+
+Each Affix component also has functionalities that allow it to modify the Affix
+stack underneath it. In the next section we describe some of these functionalities
+and how they can be used to manipulate the Affix stack.
+
+In the simplest case, a Noop Affix would have to inherit the BaseAffix and would
+need to only overload the functions copy() and get\_advertisement\_string(). As
+the Noop Affix will not be changing any of the network calls, it will not be 
+required to overload any of the network API calls.
+
+
+\subsection{Affix Stack Manipulation}
+\label{subsec-affixstack-manipulation}
+
+In Section~\ref{sec-architecture} we introducted the concept of \textit{Affix stack},
+which is a composition of multiple Affix components on top of one another. The 
+purpose of an Affix stack is to allow the user to address multiple networking 
+challenges simultaneously by stacking multiple Affix components. Various Affix stack
+APIs are provided to allow users to view and change the Affix stack that they have
+built. These functionalies allow users to view every Affix component that is in the
+stack as well as add, remove or change the order of the Affix components in the
+stack. The list of API along with their description can be found in 
+Table~\ref{tab-affixstackapi}. The calls \texttt{push()} and \texttt{pop()} can 
+be used to modify the Affix stack during any network calls. It should be noted 
+that individual Affix components have the ability to modify the stack underneath
+them, however they cannot modify the portion of the stack above them.
+
+There are many situations where one side of the network connection might want to 
+modify the stack without the other side modifying their side. An example of such
+a scenario is when one side of the network connection wants to use transparent 
+Affix components. The user may want to monitor all network communications with
+Affix components such as LogAffix or StatAffix in order to keep track of all 
+the network calls made as well as statictics on the data flow. Users may also
+want to use one sided Affixes such as DataLimitAffix or RateLimitAffix in order
+to control the amount of data that is uploaded/downloaded by the application or
+to control the throughput of the application.
+
+Applications may also be using \textit{Decider Affixes} that enforce the Dynamicity
+property that is desired by the Affix framework. Examples of such an Affix component
+would be the NatDeciderAffix, which evaluates the network connectivity and determines
+whether the node is behind a NAT or not. If the node is behind a NAT, the NatDeciderAffix
+would modify the Affix stack by adding in the NatPunchAffix underneath it in order
+to allow the node to perform NAT traversal in order to receive incoming connection.
+Another example of a Decider Affix would be a simple UDPFecDecider Affix that monitors
+the data loss and may decide to load the FECAfffix in order to reduce data loss if 
+the connectivity has a high data loss rate.
+
+\subsection{Properties of an Affix Stack}
+
+In order for an Affix stack to function properly, it needs to meet certain properties.
+Below we discuss several of it's properties and how a stack may behave under certain
+scenarios.
+
+\subsubsection{Semantics of Individual Affix Components}
+
+Each individual Affix component that resides in the Affix stack must be semantically
+consistent with the networking API, in this case with Repy. If any of the components
+are not consistent with the network API, than an unwanted exception or undesired behaviour
+may be raised by the Affix stack to the application layer. This is highly undesirable
+as this will break the \textit{Interface Compatibility} property of the Affix framework.
+Furthermore, if a component breaks semantics, it may not be permutable with other Affix
+components, breaking the \textit{Permutability} property. 
+
+\subsubsection{Building the Affix Stack}
+
+Our implementation builds the Affix stack when the stack is 
+initialized by the user rather than building the stack right before the network
+call. Building the stack at initialization allows the Affix framework to verify
+that each individual Affix components can be loaded properly. This also ensures
+that the Affix framework does not raise any internal error during the network call
+in case an Affix component cannot be loaded or initialized properly.
+
+\subsubsection{Copying an Affix Stack}
+
+When a network call is invoked, there are cases when the Affix stack is copied
+before making the network calls and there are cases when a new Affix stack is
+created instead of a copy being made. There are two simple situations between
+when a stack is copied versus when a new stack is created. 
+
+The original Affix stack is used when network calls create only one new socket. 
+For example, the API calls: listenforconnection(), listenformessage(), openconnection() 
+and sendmessage() should use the original Affix stack. The reason being, these calls 
+are invoked once and creates one individual sockets that will be used for the rest 
+of the communication. For example, every time the calls openconnection() and sendmessage() 
+is invoked, a new socket is created that can be used for the rest of communication. 
+Similarly when TCPServerSocket.listenforconnection() and UDPServerSocket.listenformessage() 
+are invoked, a new listening
+socket is created that will be used for accepting any new incoming connection.
+
+A copy of the Affix stack is made for network calls that create new sockets that 
+inherit the property of the parent socket. For example, the network calls getmessage() 
+and getconnection() should create a copy of the Affix stack before using the stack. 
+A copy of the stack is created first when the calls getmessage() and getconnection() 
+are invoked because these calls  may be called multiple times and each call will create 
+a new socket-like object which inherits the properties of the parent socket. These 
+socket-like objects will inherit the Affix stack of the parent socket and each individual 
+socket has the ability to modify the Affix stack that they inherited, independent of it's
+parent or sibling sockets.
+
+The EncryptionAffix is a good example that displays the necessity of copying the Affix
+stack in certain cases. If the EncryptionAffix is being used, the EncryptionAffix 
+generates a new set of key for use between the two endpoints of communication. If 
+the same Affix stack is used by the sockets created when invoking the calls 
+UDPServerSocket.getmessage() and TCPServerSocket.getconnection(), than all the 
+children sockets would be forced to use the same key for communication. Thus a 
+copy of the stack needs to be made in order for the child sockets to use different
+keys for encryption. On the client side however, when the calls sendmessage() and 
+openconnection() are invoked, a new socket is created that does not inherit from
+any parent socket. Thus the original Affix stack may be used for communication as
+each socket created by these calls have different instances of the Encryption Affix
+component.
+\mmm{Feel free to rewrite this section, if the wording is off.}
+
+In the next section we describe the various Affix components that we have built as
+sample components for the Affix framework.
+ 
+
+\begin{table}[t]
+\scriptsize
+\centering
+\begin{tabular*}{\columnwidth}{|l|p{4.95cm}|}
+\hline
+Affix Stack API & Description \\ \hline
+\hline
+peek() & Returns reference to the next Affix component in the stack that is right below the current Affix component. Raises an error if current stack is empty.  \\ \hline
+pop() & Will remove and return the Affix component that is right below the
+current Affix component. Raises error if the current stack is empty.  \\ \hline
+push(affix\_component) & Pushes the specified Affix component below the current
+Affix component. If we are at the top of the stack, the component is pushed to 
+the top. \\ \hline
+\end{tabular*}
+\caption{List of Affix stack API.}
+\label{tab-affixstackapi} 
+\end{table}
+\fi
+
+\iffalse
+
+
+The AFFIX framework is implemented in the subset of Python supported by version 2 
+of the Repy API developed for the Seattle testbed.  The networking portion 
+of this API is conceptually similar to the 
+Berkeley socket API. Unlike the legacy socket API, however, Repy API operations 
+are defined unambiguously and are semantically identical on all 
+supported platforms~\cite{RepyV2API}.
+\ffund{What does this mean? elaborate.}   
+
+To encapsulate functionality in an AFFIX component, a programmer needs only 
+to override the existing Repy API functions with new functionality. 
+In addition to standard networking functions such as \texttt{send}, \texttt{listen},
+and \texttt{recv}, an AFFIX component may also include functions to 
+operate on or describe (by means of an AFFIX string) the AFFIX tree beneath itself.
+
+
+
+\begin{table}[t]
+\scriptsize
+\centering
+\begin{tabular*}{\columnwidth}{|c|l|p{3.05cm}|l|} 
+\hline
+~ & Shim& Description& LOC \\ \hline
+\hline
+\rownumber & RSA & - & 217 \\ \hline
+\rownumber & NatPunch & - & 172 \\ \hline
+\rownumber & Compression & - & 208 \\ \hline
+\rownumber & HideSize & - & 183 \\ \hline
+\rownumber & FEC & - & 127 \\ \hline
+\rownumber & AsciiShifting & - & 16 \\ \hline
+\rownumber & RateLimit & - & 112 \\ \hline
+\rownumber & OneHopDetour & - & 98 \\ \hline
+\rownumber & DataLimit & - & 78 \\ \hline
+\rownumber & UdpOverTcp & - & 171 \\ \hline
+\hline
+\rownumber & CoopShim & - & 202 \\ \hline
+\hline
+\rownumber & Log & - & 162 \\ \hline
+\rownumber & UdpLoss & - & 41 \\ \hline
+\rownumber & NoopShim & - & 5 \\ \hline
+\rownumber & CheckAPI & - & 725 \\ \hline
+\hline
+\rownumber & Coordination & - & 136 \\ \hline
+\rownumber & MultiPath & - & 280 \\ \hline
+\rownumber & UdpMultiPipe & - & 138 \\ \hline
+\rownumber & UdpCompressionDecider & - & 49 \\ \hline
+\rownumber & UdpFECDecider & - & 41 \\ \hline
+\rownumber & BindLocalAddress & - & 34 \\ \hline
+\rownumber & Mobility & -  & 281 \\ \hline
+
+%CheckAPI & Validates network API semantics & 725 \\ \hline
+%Coordination & Builds a balanced shim stack & 128 \\ \hline
+%Compression & Compresses data  & 201 \\ \hline
+%DataLimit & Restricts volume of traffic over a period & 78 \\ \hline
+%RateLimit & Restricts bandwidth utilized & 112 \\ \hline
+%ForwardErrorCorrection & Writes error recovery UDP datagrams & 129
+%\\ \hline
+%Logall & Logs all network calls and traffic & 162 \\ \hline
+%%X logflows & Logs network flow information & XXX \\ \hline
+%Duplicate-UDP & Sends data over multiple shimstacks & 139 \\ \hline
+%Spiltter-TCP & Splits data, favors fast shimstacks & 274 \\ \hline
+%%X branch & Accepts connections from multiple shimstacks & XXX \\ \hline
+%NAT-TURN & TURN-like protocol for NAT traversal & 139 \\ \hline
+%X NAT-decider & Adds the next shim if one is behind a NAT & XXX \\ \hline
+%X reverse-connection & Reconnects from server to client & XXX \\ \hline
+%mobility & Handles IP address changes & XXX \\ \hline
+%One-Hop-Detour & Routes traffic through a relay & 98 \\ \hline
+%Encrypt-rsa & Encrypts traffic using RSA & 206 \\ \hline
+%Encrypt-rot & Encrypts with a Caesarean cipher & 16 \\ \hline
+%noop & Does nothing & 5 \\ \hline
+\end{tabular*}
+\caption{Currently implemented shims.}
+\label{tab-implementedshims} 
+\end{table}
+
+To confirm the utility of encapsulating network functionality in the socket API, 
+we created some sample AFFIX components.  Table~\ref{tab-implementedshims} 
+lists these components and the LOC count for each.   
+
+\ffund{Write descriptions in table}
+Lines 1-10 in Table~\ref{tab-implementedshims} describe shims 
+that encapsulate very simple, but highly practical, pieces of networking functionality.
+Next the CoopShim component, which implements the hybrid network packet recovery 
+scheme described in~\cite{sinkar2008cooperative}, is given as an example of a 
+shim that encapsulates more advanced functionality.
+
+The following four lines (12-15) describe some debugging shims that have proved to be useful 
+in developing and evaluating AFFIX performance. 
+
+The remainder of Table~\ref{tab-implementedshims} describes ``helper'' components
+that act on some way on the AFFIX tree. The first of these is the coordination shim. 
+When used as the root node of an AFFIX tree, the coordination 
+shim balances AFFIX trees across two ends of a communication flow.
+It leverages the Seattle testbed's advertise service, which is conceptually 
+a single hash table,  as the
+global naming service for the coordination procedure described in~\ref{stack:coordination}.
+
+Among the other ``helper'' components are \emph{decider} shims
+that insert or remove nodes beneath itself in the AFFIX tree, \emph{splitter} shims
+that stripe traffic across one or more children, \emph{multiplier} shims
+that duplicate traffic through one or more children, and a mobility shim that 
+enables the AFFIX tree to transparently cross network boundaries.
+A complete treatment of these special AFFIX components and particularly their implications 
+for dynamic context-aware network use is deferred to a later work. 
+
+
+\fi
+
+
+\iffalse
+This section describes our implementation of the shim framework.  After describing the overall implementation in Section~\ref{implementation-overview}, we describe how we add shims to unmodified existing applications, summarize some implemented shims, and describe our experiences in designing and building shims.
+ 
+%This includes optimizations to the lookup service to reduce load (Section~\ref{caching})
+%authenticity of shim stack data 
+
+%cutting for space
+
+%\begin{table}[t!]
+%\scriptsize
+%\centering
+%\begin{tabular*}{\columnwidth}{|l|l|} 
+%\hline
+%API Call & Description\\ \hline
+%\hline
+%
+%openconnection & Opens a TCP connection, returns streamsock. \\ \hline
+%
+%listenforconnection & Listens for TCP connections, \\
+%\hfil & returns tcpservsock. \\ \hline
+%
+%tcpservsock.getconnection & Accepts a TCP connection, \\
+%\hfil & returns streamsock. \\ \hline
+%
+%streamsock.send & Sends data over TCP. \\ \hline
+%
+%streamsock.recv & Receives data over TCP.\\ \hline
+%
+%
+%sendmessage & Sends a UDP packet. \\ \hline
+%
+%listenformessage & Listen for UDP datagrams, \\
+%\hfil & returns udpservsock. \\ \hline
+%
+%udpservsock.getmessage & Recieves a UDP datagram. \\ \hline
+%
+%getmyip & Return the Internet facing IP / hostname. \\ \hline
+%
+%*.close & Closes a streamsock, tcpservsock, \\
+%\hfil & or udpservsock. \\ \hline
+%
+%\end{tabular*}
+%\caption{Seattle network API at a glance.\label{tab-APIcalls}
+%JAC: A likely candidate to be cut.}
+%\end{table}
+
+\subsection{Implementation Overview}
+\label{implementation-overview}
+
+Our work with shims was motivated by our experiences trying to support nodes 
+participating in the Seattle testbed~\cite{Seattle_SIGCSE09,Seattlewebpage}.
+Any Internet connected device can become a Seattle node by simply running 
+the Seattle software.  This software runs along side the users other 
+applications and has performance and security isolation.
+Seattle runs on end user devices including everything from servers, desktops, 
+laptops, tablets, and phones.   Approximately 75\% of the total Seattle users 
+are home users.   As such there is a great deal of network diversity including
+mobility, nodes behind NATs, low-bandwidth nodes, as well as nodes behind 
+organizational firewalls.
+
+Our implementation leverages the Seattle testbed's advertise service as the
+global naming service.
+% (Section~\ref{sec-coordinate}).   
+While Seattle's advertise service is conceptually
+a single hash table abstraction, for robustness it uses three separate 
+services underneath, the Digital Object Registry~\cite{dor}, Seattle's
+centralized advertise service~\cite{centralizedadvertise}, and 
+OpenDHT\cite{Rhea_SIGCOMM_2005}.   We constructed a gns-dns mapping
+service for legacy applications (Section~\ref{sec-legacy}) called
+Zenodotus~\cite{Zenodotus}.
+
+We implemented our prototype in the subset of Python supported by the Repy V2 
+API for the Seattle testbed.  This API is conceptually similar to the 
+Berkeley socket API, however it is 
+semantically defined in an identical manner regardless of the 
+platform~\cite{FutureRepyAPI}.   
+
+%The API consists of the calls listed in 
+%Table~\ref{tab-APIcalls}.
+
+A shim is an object that has all of the same functions as the Seattle API.
+To encapsulate functionality, a programmer simply overrides the functions they
+want to change with new functionality.   Besides networking functions, 
+there are also functions to copy, serialize, and deserialize shim stacks.   
+These routines are used to coordinate a balanced shim stack
+and instantiate it.  
+
+Each shim also contains a reference to the shim stack(s) beneath it.   The shim stack 
+possesses functions to push, pop, and peek at the next shim in the shim 
+stack.   These features are primarily used by decider shims to manipulate
+the functionality that is used beneath them.   
+
+\subsection{Deploying Shims}
+\label{sec-add-application}
+
+\ffund{This is a good place to mention the benefits of having multiple paths to 
+deployment: a tech-savvy 
+user may deploy on his own initiative, a developer can integrate into 
+application, an OS or device manufacturer could deploy systemwide.}
+
+\ffund{Make sure to explicitly state that every deployment path besides for native 
+does ***not*** require modifying the source of an application}
+
+\ffund{ToDo: A ***very simple*** figure illustrating the various deployment methods.}
+
+\ffund{ToDo: include interposition work.}
+
+%In order for shims to be useful, they must be used by an application.
+There are several techniques we use to add shims to a program without
+modifying them.  For Seattle applications, we leverage the interposition
+mechanisms that are inherent in the Repy V2 API.   This interposition 
+mechanism, called security layers in other work~\cite{Cappos_CCS_10}, allows
+functionality to replace the usual API calls for the sandbox.   As a result,
+the usual networking calls are mapped to use shims.   Adding shims in this way
+is very lightweight, adding only a few microseconds of delay and around 1KB of 
+memory per shim in addition to whatever the shim's functionality requires.
+
+Note that the use of security layers also provides
+an inherent security boundary here if desired.   For example, if the owner
+of the machine wants to rate limit Seattle applications, they can do so
+by including a rate limit shim in a security layer and failing to
+map the shim stack object (which precludes access to pop).   
+
+%what is the second  mechanism??  if time permits, we should elaborate...
+We also use shims in legacy applications like Apache.   
+%We do this by one of two mechanisms.   First, 
+We have constructed a legacy relay
+program which supports shims (Section~\ref{sec-legacy}).   By running 
+a relay on both the client and the server, the traffic is tunneled through
+shims.   This obviously does not require any modification to the application.
+We have found this simple to run in practice, but does not work for 
+applications that perform actions outside of the API.   For instance, an 
+application that sends traffic that is not TCP or UDP will not have its 
+traffic correctly routed through our relay.   However, most applications do 
+not need this functionality and so will work fine using a legacy relay.  Moving forward,
+we plan to explore interposing on legacy applications using a 
+library or system call interposition mechanism like {\tt LDPRELOAD}.
+
+
+
+\subsection{Sample Shims}
+\label{sec-examplelayers}
+
+To test the feasibility of encapsulating network functionality in shims, 
+we constructed many example shims.   Table~\ref{tab-implementedshims} 
+shows a list of the shims and provides the LOC count for each shim.   
+Note that about 57 LOC are boilerplate template code that defines the
+methods and return values added by each shim.   All of our shims were
+implemented by undergraduate students.   
+
+We semantically validated each shim by running it with the checkAPI shim.   
+This was very useful in detecting semantic violations and helped us 
+debug our shim implementations.   
+
+\eat{
+\subsection{Experiences}
+
+%JAC: I don't really know what to do with this, but it seems we need some
+%section like this.   Danny has some good information in his thesis we 
+%should be able to use.
+
+%Danny: 
+Preserving the semantic-consistency comes with a cost: shims
+can be difficult to implement.  For example, consider our compression shim.
+A compression library that is not concerned with being semantically-consistent
+simply breaks up an input stream into distinct chunks, applies compression, and 
+sends individual compressed chunks over the network. The Seattle sockets, however, are
+non-blocking. Any stage of message segmentation, compression, and
+transmission may be interrupted. The compression shim, therefore, has to keep
+track of the state of all these stages. It should be able to recover
+from an interrupted state if the application decides to resume
+transmission at any time. A simple compression library would take less than 100
+lines of Python code. Our compression shim consists of 200 lines. It
+requires considerable effort to design, implement, and debug. 
+}
+%(Danny: In my thesis, I also mentioned a number of limitations. Refer
+%to the content page. The paragraph above does not appear in the
+%thesis.) 
+
+%Throughout the process of implementing shims, we discovered many lessons
+%that helped us to think more clearly about network semantics.
+
+%Repeated lookups by the coordination shim can generate a fair amount of
+%traffic for the advertise service.   To mitigate this, we cache global
+%naming service information for a short period of time (30 seconds).   Much 
+%like DNS caching, this prevents repeated lookups at the cost of increasing
+%the chance of receiving stale information.
+
+
+
+%\subsection{Caching in Lookups}
+%\label{caching}
+
+%A potentially significant amount of overhead could come from looking up shim stack information in the advertise service.   Much like in DNS, our solution is to use caching. Assuming that the server's shim stack is not changed over a short period of time, the client's coordination shim caches the contents of the server's shim stack. Any subsequent new connection to the server will read from the cache. 
+
+%In very rare cases, we discovered that obsolete network content was used by the client.   To mitigate any potential impact from this, we modified the coordination shim to detect this problem and flush the cache entry.  
+
+\fi
+
+
+
+
+
